@@ -4,9 +4,11 @@ lectures := $(wildcard slides/*.tex)
 slides := $(lectures:.tex=.pdf)
 scripts := $(wildcard scripts/*.Rmd)
 
+.ONESHELL:
 %.pdf: %.tex
-	xelatex $<
-	xelatex $<
+	cd $(@D)
+	xelatex $(notdir $<)
+	xelatex $(notdir $<)
 
 
 publish: $(slides) $(scripts)
