@@ -1,0 +1,120 @@
+---
+title: "Contrastive analysis"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Пример контрастивного анализа: жуткая стилистика «Макбета»
+
+Загрузка данных. Корпус произведений Шекспира имеется у нас в виде
+каталога с набором текстовых файлов. Каждое произведение — отдельный
+файл. Первая задача — загрузить тексты из этих файлов в датасет,
+пригодный для дальнейшей обработки.
+
+Прежде всего составим список файлов:
+
+```{r}
+library(stringr)
+plays <- list.files("cmta2021/data/shakespeare")
+names <- str_extract(plays, "^[^_]+")
+paths <- paste("cmta2021/data/shakespeare", plays, sep="/")
+names(paths) <- names
+```
+
+Регулярное выражение для извлечения названий произведений из имен
+файлов: 
+
+* ^ → начало строки
+* [^_] → любой символ кроме "_"
+* "^[^_]+" → один или более любых символов кроме "_" в начале строки
+
+Теперь прочитаем все файлы и сохраним в один датафрейм, по одному
+произведению на строку: 
+
+```{r}
+library(readr)
+shakespeare <- as.data.frame(do.call(rbind, lapply(paths, read_file)))
+```
+
+Почистим данные: удалим указания на то, какому персонажу принадлежит
+реплика (написаны заглавными буквами в начале строки) с помощью
+регулярного выражения.
+
+```{r}
+shakespeare$V1 <- str_replace_all(shakespeare$V1, "\n[A-Z ]+", "")
+```
+
+Токенизируем тексты.
+
+```{r}
+library(tibble)
+shakespeare.long <- shakespeare %>%
+    rownames_to_column("id") %>%
+    unnest_tokens(word, "V1", token = "word")
+head(shakespeare.long)
+```
+
+Формируем фокусный корпус (Макбет). В качестве контрастного корпуса
+будут выступать все произведения Шекспира (shakespeare.long). 
+
+```{r}
+macbeth <- shakespeare.long %>%
+    filter(id=="macbeth")
+```
+
+Объединим два корпуса в один датафрейм и удалим все слова, включающие
+цифры. А заодно заменим сокращенную форму артикля th' на полную the.
+
+```{r}
+sh.all <- bind_rows(macbeth=macbeth, other=shakespeare.long, .id="corpus") %>%
+    filter(!str_detect(word, "[0-9]")) %>%
+    mutate(word = ifelse(word=="th", "the", word))
+```
+
+Вычислим частотность всех слов в обоих корпусах и составим
+сравнительную таблицу с помощью функции tidyr::spread.
+
+```{r}
+library(tidyr)
+sh.freq <- sh.all %>%
+    group_by(corpus) %>%
+    count(word) %>%
+    spread(corpus, n, fill=0) %>%
+    arrange(desc(macbeth+other))
+sh.freq
+```
+
+Вычислим нормализованную частотность — количество употреблений слова в
+каждом корпусе, деленное на 10000. 
+
+```{r}
+sh.ipm <- sh.freq %>%
+    mutate(macbeth.ipm = macbeth / sum(macbeth) * 10000,
+           other.ipm = other / sum(other) * 10000)
+sh.ipm
+```
+
+Определим функцию для вычисления Dunning log-likelihood (G^2):
+
+```{r}
+g2 = function(a, b) {
+  c = sum(a)
+  d = sum(b)
+  E1 = c * ((a + b) / (c + d))
+  E2 = d * ((a + b) / (c + d))
+  return(2*((a*log(a/E1+1e-7)) + (b*log(b/E2+1e-7))))
+}
+```
+
+Применим функцию g2, определенную выше, для вычисления log-likelihood,
+отсортируем результаты по значению g2. 
+
+```{r}
+sh.ll <- sh.ipm %>%
+    mutate(g2 = g2(macbeth, other)) %>%
+    arrange(desc(g2))
+sh.ll
+```
