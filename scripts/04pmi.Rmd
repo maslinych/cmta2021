@@ -1,0 +1,160 @@
+---
+title: "Contrastive analysis continued"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Контрастивный анализ — продолжение
+
+Продолжим анализ на примере Макбета, используя в качестве мер для
+извлечения характерной лексики PMI и tidylo.
+
+Повторим загрузку корпуса, разбиение на фокусный и контрастный
+подкорпуса и подготовку частотных списков.
+
+```{r}
+library(stringr)
+plays <- list.files("cmta2021/data/shakespeare")
+names <- str_extract(plays, "^[^_]+")
+paths <- paste("cmta2021/data/shakespeare", plays, sep="/")
+names(paths) <- names
+```
+
+```{r}
+library(readr)
+shakespeare <- as.data.frame(do.call(rbind, lapply(paths, read_file)))
+```
+
+```{r}
+shakespeare$V1 <- str_replace_all(shakespeare$V1, "\n[A-Z ]+", "")
+```
+
+```{r}
+library(tibble)
+shakespeare.long <- shakespeare %>%
+    rownames_to_column("id") %>%
+    unnest_tokens(word, "V1", token = "word")
+head(shakespeare.long)
+```
+
+```{r}
+sh.all <- shakespeare.long %>%
+    mutate(corpus = ifelse(id == "macbeth", "macbeth", "other")) %>%
+    mutate(word = ifelse(word=="th", "the", word))
+```
+
+```{r}
+library(tidyr)
+sh.freq <- sh.all %>%
+    group_by(corpus) %>%
+    count(word) %>%
+    spread(corpus, n, fill=0) %>%
+    arrange(desc(macbeth+other))
+```
+
+
+### PMI — Pointwise mutual information
+
+Pointwise mutual information — PMI = log2(p(x,y)/p(x)p(y))
+
+Для наглядности в этом примере мы воспользуемся эквивалентным
+определением: PMI = log2(p(x|y)/p(x)), где 
+
+* p(x|y) — вероятность встретить слово x в Макбете p(x|Макбет).
+* p(x) — вероятность встретить слова у Шекспира в целом (втч. в
+  Макбете). 
+
+Создадим колонки с двумя нужными нам для вычисления PMI вероятностями.
+
+```{r}
+sh.p <- sh.freq %>%
+    mutate(p.x_y = macbeth/sum(macbeth), p.x = (macbeth+other)/(sum(macbeth)+sum(other)))
+sh.p
+```
+
+Вычислим PMI и отсортируем лексику по значению.
+
+```{r}
+sh.pmi <- sh.p %>%
+    mutate(macbeth.pmi = log2(p.x_y/p.x)) %>%
+    arrange(desc(macbeth.pmi))
+sh.pmi
+```
+
+Рассмотрим менее тривиальные примеры характерных слов (которые
+встречаются не только в Макбете):
+
+```{r}
+sh.pmi %>%
+    filter(other>0) %>%
+    head(100) %>%
+    View
+```
+
+Как pmi характеризует более частотные слова: 
+
+```{r}
+sh.pmi %>%
+    filter(macbeth+other > 50) %>%
+    filter(other > 0) %>%
+    head(100) %>%
+    View
+```
+
+А что с самыми частотными словами? 
+
+```{r}
+sh.pmi %>%
+    arrange(desc(macbeth+other))
+```
+
+### Метод tidylo
+
+Введение от автора, Julia Silge:
+https://juliasilge.com/blog/introducing-tidylo/
+
+На примере Макбета:
+
+Подготовим данные по частотности слов в каждом подкорпусе в «длинном»
+формате. 
+
+```{r}
+library(tidylo)
+sh.counts <- sh.all %>% count(corpus, word, sort=TRUE)
+head(sh.counts)
+```
+Добавим колонку с со значением weighted_log_odds:
+
+```{r}
+sh.lo <- sh.counts %>%
+    bind_log_odds(corpus, word, n)
+```
+
+Выберем наиболее характерные слова для Макбета: 
+
+```{r}
+sh.lo %>% filter(corpus=="macbeth") %>%
+    arrange(desc(log_odds_weighted)) %>% head(30)
+```
+
+Для остального Шекспира:
+
+```{r}
+sh.lo %>% filter(corpus=="other") %>%
+    arrange(desc(log_odds_weighted)) %>% head(30)
+```
+
+**Внимание, особенность!** Самые нехарактерные слова корпуса other
+(весь остальной Шекспир):
+
+```{r}
+sh.lo %>%
+    filter(corpus=="other") %>%
+    arrange(log_odds_weighted) %>%
+    head(30)
+```
+
+Почему здесь преобладает самая частотная лексика?
