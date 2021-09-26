@@ -3,7 +3,7 @@ DIR := /var/www/maslinsky/courses/cmta2021
 lectures := $(wildcard slides/*.tex)
 slides := $(lectures:.tex=.pdf)
 scripts := $(shell git ls-files scripts/*.Rmd)
-reader := denny2017preprocessing.pdf
+reader := denny2017preprocessing.pdf The_language_of_Macbeth.pdf
 SERVER := rstudio
 SERVERDIR := /var/lib/rstudio-server/data/cmta2021
 
