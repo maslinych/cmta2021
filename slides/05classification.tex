@@ -211,6 +211,180 @@ Docs    вовочк       дет класс      урок учител учит
   \end{description}
 \end{frame}
 
+\section{Наивный Байес}
+
+\begin{frame}
+  \frametitle{Правило Байеса}
+  \only<1>{
+    \begin{columns}
+      \column{.5\textwidth}
+      $$
+      P(A \text{ и } B) =
+      $$
+
+  $$
+  P(B)P(A|B) = P(A)P(B|A)
+  $$
+  \column{.5\textwidth}
+  \includegraphics[width=\textwidth]{bayes-himself}
+\end{columns}
+  }
+  \only<2>{
+  \begin{equation}
+    P(A|B) = \frac{P(B|A)P(A)}{P(B)}
+  \end{equation}
+  \pause
+  \begin{equation}
+    posterior = \frac{likelihood \cdot prior}{evidence}
+  \end{equation}  
+}
+\end{frame}
+
+\begin{frame}[standout]
+  \begin{itemize}
+  \item $P(\text{менеджер|застенчивый}) = ?$
+  \item $P(\text{библиотекарь|застенчивый}) = ?$
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[standout]
+  \begin{itemize}
+  \item $P(\text{менеджер}) = \frac{10 \text{млн}}{80 \text{млн}} = 0.125$
+  \item $P(\text{библиотекарь}) = \frac{0,5 \text{млн}}{80
+      \text{млн}} = 0.00625$
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Задача классификации образов}
+  Задача:
+  \begin{itemize}
+  \item Заранее известен список \alert{классов}
+  \item Необходимо автоматически отнести каждый объект к одному из
+    классов
+  \item Каждый объект представлен в виде набора признаков (features)
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Правило Байеса применительно к классификации}
+\begin{equation}
+    P(\text{label}|\text{features}) = \frac{P(\text{features}|\text{label})P(\text{label})}{P(\text{features})}
+  \end{equation}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Naive Bayes classifier}
+  \begin{itemize}
+  \item Задача:  Имея набор свойств (E) выбрать наиболее вероятную гипотезу
+    (класс, H). Знаменатель Р(E) — константа и не влияет на результат классификации.
+  $$
+   P(\text{label}|\text{features}) \propto P(\text{features}|\text{label}) P(\text{label})
+   $$
+   \end{itemize}
+   \alert{Maximum a posteriory estimation}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Упрощающее предположение}
+\begin{itemize}
+ \item Вычислить likelihood:
+   $$
+   P(\text{features}|\text{label}) = 
+   $$
+ \item \structure{Bayes assumption}: Все свойства независимы друг от друга.
+   $$
+   = \prod_{f \in \text{features}} P(f|\text{label})
+   $$
+ \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Naive Bayes example}
+  % \begin{columns}
+  %   \column{.5\textwidth}
+    \only<1>{\includegraphics[width=\textwidth]{bayes1}}
+  %   \column{.5\textwidth}
+\only<2>{
+ $$\text{Prior(Green)}\propto \frac{f(\text{Green})}{\text{total}}=\frac{40}{60}$$
+
+ $$\text{Prior(Red)}\propto c\frac{f(\text{Red})}{\text{total}}=\frac{20}{60}$$
+}
+  % \end{columns}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Naive Bayes example}
+  % \begin{columns}
+  %   \column{.5\textwidth}
+\only<1>{    \includegraphics[width=\textwidth]{bayes2}}
+    % \column{.5\textwidth}
+
+\only<2>{
+    \begin{itemize}
+    \item $$\text{Likelihood(X|Green)}\propto \frac{f(\text{Green near X})}{f(\text{Green})}=\frac{1}{40}$$
+    \item $$\text{Likelihood(X|Red)}\propto \frac{f(\text{Red near X})}{f(\text{Red})}=\frac{3}{20}$$
+    \end{itemize}
+}
+  % \end{columns}
+\only<3>{
+  $$
+  \text{Posterior(Green|X)} \propto \text{Likelihood(X|Green)} \times
+  \text{Prior(Green)} = \frac{4}{6}\times\frac{1}{40}=\frac{1}{60}
+  $$
+
+  $$
+  \text{Posterior(Red|X)} \propto \text{Likelihood(X|Red)} \times
+  \text{Prior(Red)} = \frac{2}{6}\times\frac{3}{20}=\frac{1}{20}
+  $$
+}
+
+\end{frame}
+
+
+\begin{frame}
+  \frametitle{Эксперимент}
+% \only<1>{
+  \alert{Эксперимент на людях}
+% }
+% \only<2>{
+%   \alert{Эксперимент на печеньках}
+% }
+\end{frame}
+
+
+\begin{frame}[standout]
+  Наивный Байес — генеративный классификатор:
+
+  \begin{itemize}
+  \item строит модель каждого класса
+  \item определяет вероятность, что наблюдаемые данные \alert{сгенерированы} по~модели
+    данного класса
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Наивный Байес: преимущества и недостатки}
+  Преимущества:
+  \begin{itemize}
+  \item Годится для большого числа атрибутов, малой обучающей выборки
+  \item На удивление хорошо работает в очень многих задачах
+  \item Вычислительно эффективен (быстро учится и классифицирует)
+  \end{itemize}
+  Недостатки:
+  \begin{itemize}
+  % \item Предположение о независимости неверно.
+  \item Проблема нулевых значений (атрибут не встречается в обучающей
+    выборке) — требует сглаживания
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Аддитивное сглаживание}
+  \framesubtitle{Laplas smoothing}
+  \includegraphics[width=.7\textwidth]{additive-smoothing}
+\end{frame}
+
 \section{Проклятие размерности}
 
 \begin{frame}[fragile]
