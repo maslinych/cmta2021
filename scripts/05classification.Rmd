@@ -21,7 +21,7 @@ library(dplyr)
 library(stringr)
 detectives <- meta %>% filter(str_detect(genre, "detective")) %>%
     filter(year > 1990) %>% filter(author_sex %in% c("м", "ж")) %>%
-    select(filename, , author_sex, author, title, year)
+    select(filename, author_sex, author, title, year)
 View(detectives)
 ```
 
