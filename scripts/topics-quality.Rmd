@@ -8,9 +8,9 @@ output: html_document
 # Подготовка данных
 
 ```{r}
-library(tidyverse)
+library(dplyr)
 library(ggplot2)
-students = read.csv("topics-data.csv", encoding = "UTF-8")
+students = read.csv("data/topics-data.csv", encoding = "UTF-8")
 students$topic_id = str_replace(students$topic_id, "з", "30")
 students$topic_id = as.numeric(students$topic_id)
 students$quality = str_to_lower(students$quality)
@@ -25,140 +25,145 @@ students$title = str_remove_all(students$title, "[?]")
 students$title = ifelse(str_length(students$title) == 0, NA, students$title)
 
 # считаем оценки по полноте разметки (итоговая оценка в колонке rounded)
-grades = students %>% 
+grades <- students %>% 
   group_by(user) %>% 
   summarise(NA_title = sum(is.na(title)), NA_quality = sum(is.na(quality)), NA_type = sum(is.na(type[quality != "good"])), NA_share = (NA_quality + NA_title + NA_type)/900, completeness = 1 - NA_share, grade = completeness*10, rounded = round(grade, 0))
-
 grades
-
-ggplot(grades) +
-  geom_histogram(aes(grade)) +
-  scale_y_continuous(breaks = 1:23) +
-  theme_bw()
 ```
+
 
 # Общая критичность разметчика
 
+Посчитаем для каждого количество тем, качество которых студент_ка разметил_а как "bad" или "medium"
+
 ```{r}
-# Посчитаем для каждого количество тем, качество которых студент_ка разметил_а как "bad" или "medium"
-students %>% 
-  filter(quality %in% c("bad", "medium")) %>%
-  group_by(user) %>% 
-  summarise(n = n(), criticism = n/300) %>% 
-  arrange(desc(criticism))
+qsplit <- students %>%
+    filter(!is.na(quality)) %>%
+    group_by(user, quality) %>% 
+    summarise(q = n()) %>%
+    group_by(user) %>%
+    mutate(p = q/sum(q))
+qsplit
+```
+
+```{r}
+qsplit %>%
+    filter(quality=="good") %>%
+    mutate(criticism=1-p) %>%
+    arrange(desc(criticism)) %>%
+    View
 ```
 
 # Inter-rater agreement (reliability) - согласованность оценок качества тем
 
-Cohen's Kappa - статистика, которая используется для измерения межэкспертной надежности качественных элементов. Обычно считается, что это более надежная мера, чем простой расчет процента согласия, поскольку учитывает возможность совпадения случайно
+Cohen's Kappa — статистика, которая используется для измерения межэкспертной надежности качественных элементов. Обычно считается, что это более надежная мера, чем простой расчет процента согласия, поскольку учитывает возможность совпадения случайно
 
 ```{r}
 library(irr)
-
-topic_quality = students %>% 
-  select(1, 2, 6) %>% 
+library(tidyr)
+topic_quality <- students %>% 
+  select(user, topic_id, quality) %>% 
   ungroup() %>% 
       mutate(., quality = with(., case_when(
-        quality == "bad" ~ "0",
-        quality == "medium" ~ "0.5",
-        quality == "good" ~ "1"
-)))
+        quality == "bad" ~ 0,
+        quality == "medium" ~ 0.5,
+        quality == "good" ~ 1
+        )))
 
-topic_quality$quality = as.numeric(topic_quality$quality)
-
-topic_quality = topic_quality %>% 
+tq_numeric <- topic_quality %>%
   pivot_wider(names_from = user, values_from = quality)
 ```
 
 Посчитаем ICC (Inter-Class Correlation Coefficient) и Каппу - метрики для оценки IRR. Различаются типом данных, по которым их можно считать.
 
-```{r}
-icc(topic_quality[, c(2:24)], model="twoway", type="agreement", unit="average") # для непрерывных переменных с несколькими (больше 2) разметчиками
+Для непрерывных переменных с несколькими (больше 2) разметчиками:
 
-kappam.fleiss(topic_quality[, c(2:24)]) # для категориальных и ординальных переменных с несколькими (больше 2) разметчиками
+```{r}
+icc(tq_numeric[, c(2:24)], model="twoway", type="agreement", unit="average") 
+```
+
+Для категориальных и ординальных переменных с несколькими (больше 2) разметчиками
+
+```{r}
+kappam.fleiss(tq_numeric[, c(2:24)]) 
 ```
 
 Формулы игнорируют пропущенные значения (NA), но исключение/добавление разметчиков может влияет на уровень согласованности
 
-```{r}
-# сколько NA в оценках качества тем?
-sum(is.na(students$quality))
+сколько NA в оценках качества тем?
 
-# посмотрим, у кого стоит больше всего NA
+```{r}
+sum(is.na(students$quality))
+```
+посмотрим, у кого стоит больше всего NA
+
+```{r}
 students %>% 
   filter(is.na(quality) == TRUE) %>% 
   select(user) %>% 
   table() %>% 
   as.data.frame() %>% 
   arrange(desc(Freq))
+```
 
-# посмотрим, улучшит ли показатель согласованности исключение разметчиков, у которых было много NA
-topic_quality = students %>% 
-  filter(!(user %in% c("dnrepin", "ispetrov"))) %>% 
-  select(1, 2, 6) %>% 
-  ungroup() %>% 
-      mutate(., quality = with(., case_when(
-        quality == "bad" ~ "0",
-        quality == "medium" ~ "0.5",
-        quality == "good" ~ "1"
-)))
+посмотрим, улучшит ли показатель согласованности исключение разметчиков, у которых было много NA
 
-topic_quality$quality = as.numeric(topic_quality$quality)
-
-topic_quality = topic_quality %>% 
-  pivot_wider(names_from = user, values_from = quality)
-
-icc(topic_quality[, c(2:22)], model="twoway", type="agreement", unit="average")
-
-kappam.fleiss(topic_quality[, c(2:22)])
+```{r}
+kappam.fleiss(tq_complete[, c(2:22)])
 ```
 
 # Inter-rater agreement (reliability) - согласованность разметок типа ошибок
 
+сколько NA в разметках типа ошибок?
+
 ```{r}
-# сколько NA в разметках типа ошибок?
 sum(is.na(students$type[students$quality != "good"]))
+```
 
-# посмотрим, у кого стоит больше всего NA
+посмотрим, у кого стоит больше всего NA
+```{r}
 students %>% 
-  filter(quality != "good") %>% 
-  filter(is.na(type) == TRUE) %>% 
-  select(user) %>% 
-  table() %>% 
-  as.data.frame() %>% 
-  arrange(desc(Freq))
+    filter(quality != "good") %>% 
+    filter(is.na(type) == TRUE) %>% 
+    select(user) %>% 
+    table() %>% 
+    as.data.frame() %>% 
+    arrange(desc(Freq))
+```
 
+```{r}
 topic_type = students %>%
-  select(1,2,7) %>%
-  pivot_wider(names_from = user, values_from = type)
+    select(1,2,7) %>%
+    pivot_wider(names_from = user, values_from = type)
 ```
 
 Посчитаем Каппу (двумя способами) - метрики для оценки IRR
 
+для категориальных переменных с несколькими (больше 2) разметчиками
 ```{r}
-kappam.light(topic_type[, c(2:24)]) # для категориальных переменных с несколькими (больше 2) разметчиками
+kappam.light(topic_type[, c(2:24)]) 
+```
+для категориальных и ординальных переменных с несколькими (больше 2) разметчиками
 
-kappam.fleiss(topic_type[, c(2:24)]) # для категориальных и ординальных переменных с несколькими (больше 2) разметчиками
+```{r}
+kappam.fleiss(topic_type[, c(2:24)]) 
 ```
 
 # Корреляции 
 
 Насколько средняя оценка качества тем коррелирует с формальными показателями?
 
+
 ```{r}
-data = students %>% 
-  select(topic_id, quality)
-data = na.omit(data)
-data$quality = ifelse(data$quality == "bad", 0,
-                      ifelse(data$quality == "medium", 0.5, 1))
-data = data %>% 
-  group_by(topic_id) %>% 
-  summarise(mean_quality = mean(quality))
+data <- topic_quality %>%
+    filter(!is.na(quality)) %>%
+    group_by(topic_id) %>% 
+    summarise(mean_quality = mean(quality))
 ```
 
 ```{r}
 library(xml2)
-diag = read_xml("diag300.xml")
+diag = read_xml("data/diag300.xml")
 links = xml_find_all(diag, "//topic")
 topics = bind_rows(lapply(xml_attrs(links), function(x) data.frame(as.list(x), stringsAsFactors=FALSE)))
 topics$id = rep(1:300)
@@ -167,8 +172,27 @@ topics$mean_quality = data$mean_quality
 ```
 
 ```{r}
-library(sjPlot)
-tab_corr(topics)
+library(corrplot)
+corrplot(cor(topics[,2:ncol(topics)]))
+```
+Документация, где расшифровано значение показателей качества тем: https://mallet.cs.umass.edu/diagnostics.php
+
+Посмотрим корреляцию coherence с экспертной оценкой качества темы:
+
+```{r}
+topics %>% ggplot(aes(x=coherence,y=mean_quality)) + geom_point() + geom_smooth(method="lm")
+```
+
+Посмотрим корреляцию размера с экспертной оценкой качества темы:
+
+```{r}
+topics %>% ggplot(aes(x=tokens,y=mean_quality)) + geom_point() + geom_smooth(method="lm")
+```
+
+То же в логарифмической шкале
+
+```{r}
+topics %>% ggplot(aes(x=log(tokens),y=mean_quality)) + geom_point() + geom_smooth(method="lm", formula = y ~ x + I(x^2))
 ```
 
 # Регрессионная модель
@@ -176,6 +200,6 @@ tab_corr(topics)
 Предсказываем среднюю оценку качества тем по формальным показателям
 
 ```{r}
-model = lm(mean_quality ~ .-id, data = topics)
+model <- lm(mean_quality ~ .-id, data = topics)
 summary(model)
 ```
