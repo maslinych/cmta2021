@@ -10,7 +10,7 @@ output: html_document
 ```{r}
 library(dplyr)
 library(ggplot2)
-students = read.csv("data/topics-data.csv", encoding = "UTF-8")
+students = read.csv("cmta2021/data/topics-data.csv", encoding = "UTF-8")
 students$topic_id = str_replace(students$topic_id, "з", "30")
 students$topic_id = as.numeric(students$topic_id)
 students$quality = str_to_lower(students$quality)
@@ -19,12 +19,16 @@ students$type = str_to_lower(students$type)
 
 # Оценки
 
+убираем знаки вопроса в разметке тем (если вопросом было размечено название темы полностью, то расцениваем как NA)
+
 ```{r}
-# убираем знаки вопроса в разметке тем (если вопросом было размечено название темы полностью, то расцениваем как NA)
 students$title = str_remove_all(students$title, "[?]")
 students$title = ifelse(str_length(students$title) == 0, NA, students$title)
+```
 
-# считаем оценки по полноте разметки (итоговая оценка в колонке rounded)
+считаем оценки по полноте разметки (итоговая оценка в колонке rounded)
+
+```{r}
 grades <- students %>% 
   group_by(user) %>% 
   summarise(NA_title = sum(is.na(title)), NA_quality = sum(is.na(quality)), NA_type = sum(is.na(type[quality != "good"])), NA_share = (NA_quality + NA_title + NA_type)/900, completeness = 1 - NA_share, grade = completeness*10, rounded = round(grade, 0))
@@ -163,7 +167,7 @@ data <- topic_quality %>%
 
 ```{r}
 library(xml2)
-diag = read_xml("data/diag300.xml")
+diag = read_xml("cmta2021/data/diag300.xml")
 links = xml_find_all(diag, "//topic")
 topics = bind_rows(lapply(xml_attrs(links), function(x) data.frame(as.list(x), stringsAsFactors=FALSE)))
 topics$id = rep(1:300)
