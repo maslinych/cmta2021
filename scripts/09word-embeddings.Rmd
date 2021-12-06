@@ -1,0 +1,72 @@
+---
+title: Word embeddings. Playground
+author: Kirill Maslinsky
+output: html_document
+editor_options: 
+  chunk_output_type: console
+  code_folding: show
+---
+
+
+```{r}
+library(magrittr)
+library(wordVectors)
+```
+
+## LOAD WORD VECTORS
+```{r}
+vectors <- read.vectors("ruscorpora_1_300_10.bin", binary=TRUE)
+```
+
+## search in the vicinity of a given word
+
+```{r}
+vectors %>% closest_to("плакать_VERB")
+vectors %>% closest_to("слеза_NOUN")
+```
+
+## adding and plotting
+
+```{r}
+crying <- vectors %>% closest_to(~"плакать_VERB" + "слеза_NOUN", 75)
+vectors[[crying$word, average=F]] %>% plot(method="pca")
+```
+
+## adding and subtracting meanings
+
+```{r}
+vectors %>% closest_to("хороший_ADJ",30)
+vectors %>% closest_to("плохой_ADJ",30)
+vectors %>% closest_to(~"хороший_ADJ"+"плохой_ADJ",30)
+vectors %>% closest_to(~"хороший_ADJ"-"плохой_ADJ",30)
+vectors %>% closest_to(~"плохой_ADJ"-"хороший_ADJ",30)
+```
+
+## vectors %>% closest_to(~"king" - "man" + "woman")
+
+```{r}
+vectors %>% closest_to("москва_NOUN")
+vectors %>% closest_to(~"москва_NOUN" - "россия_NOUN" + "украина_NOUN")
+```
+
+
+## semantic “dimensions”
+
+```{r}
+vectors[[c("тетя_NOUN","дядя_NOUN","брат_NOUN","сестра_NOUN","бабушка_NOUN","дедушка_NOUN","муж_NOUN","жена_NOUN"), average=F]] %>% plot(method="pca") 
+```
+
+##
+```{r}
+top_evaluative_words <- vectors %>% closest_to(~"хорошо_ADV"+"плохо_ADV", n=75)
+goodness <- vectors %>% closest_to(~"хорошо_ADV"-"плохо_ADV",n=Inf)
+eat <- vectors %>% closest_to(~"съедать_VERB" - "выпивать_VERB",n=Inf)
+```
+
+```{r}
+library(ggplot2)
+top_evaluative_words %>%
+    inner_join(goodness) %>%
+    inner_join(eat) %>%
+    ggplot() + geom_text(aes(x=`similarity to "съедать_VERB" - "выпивать_VERB"`, y=`similarity to "хорошо_ADV" - "плохо_ADV"`,label=word))
+```
